@@ -1,0 +1,477 @@
+MONOLITHIC AND MICROSERVICES
+============================
+In Monolithic all components are in single application
+there is SPOF , 
+Scaling will be costly
+Code complexity is high
+if one service is down all services will crash
+
+In MicroServices:
+
+A MICROSERVICE IS AN ENGINEERING APPROACH FOCUSED ON 
+DECOMPOSING APPLICATIONS INTO SINGLE-FUNCTION MODULES
+ WITH WELL-DEFINED INTERFACES WHICH ARE INDEPENDENTLY DEPLOYED
+ AND OPERATED BY SMALL TEAMS WHO OWN THE ENTIRE LIFECYCLE OF THE SERVICE.
+ 
+All components are in separate modules,
+There is no spof
+Scaling is not costly 
+maintenace is easy
+low code complexity
+if one service is down others will work
+
+Spring Cloud
+============
+1. Spring cloud Open Feign
+2. Spring cloud Netflix Eureka
+3. Spring Cloud Load Balancer
+4. Spring Cloud API Gateway
+5. Fault Tolerance
+6. Sleuth and Zipkin 
+->Trace flow of tasks ->Trace
+flow of Calls Between microservices : Zipkin is GUI tool for this.
+7. Config server  
+-> e.g , You have some change in config i.e you want to
+change mysql to mongo ,in that case you need to change everywhere
+instead of this keep one file for all services running and do one time change
+here comes config server.
+
+
+Now we have project which is monolithic all services are in one;
+e.g student service and address service ,
+
+but create new projects separately for each one 
+i.e one for address-service and one for student service
+
+***First create for address-service
+   >>in application.properties file copy all properties and add
+   #spring.application.name = address-service
+   
+   also change port to 8082
+   #server.port = 8082
+   
+   >>Create packages:
+      entity
+	  controller
+	  service
+	  repository
+	  request
+	  response
+   >>use some annotations in base class
+     #@ComponentScan({"com.infuse.controller", "com.infuse.service"})
+	 -->This will tell spring to find and scan components because we are using hirarchy
+	 ->without this we have to manually tell spring to find bean
+	 
+     #@EntityScan("com.infuse.entity")
+	 -->if entities are in different packages we should tell spring that entity is here
+	 
+     @EnableJpaRepositories("com.infuse.repository")
+	 -->this is to tell repository is here;
+	 
+	>>Create controller class and all classes
+	in service class use Logger from slf4j (simple logger facode for java)
+	   #Logger logger = LoggerFactory.getLogger(AddressService.class);
+	   logger.info() -->to print information in console
+	   logger.error() --> to print any errors
+	
+--------------------------------------------------------------------------------------------------------	
+***Second create for student-service
+   >>in application.properties file copy all properties and add
+   #spring.application.name = student-service
+   also change port to 8080
+   #server.port = 8080
+   
+   >>Create packages:
+      entity
+	  controller
+	  service
+	  repository
+	  request
+	  response
+	  
+	>>use some annotations in base class 
+     #@ComponentScan({"com.infuse.controller", "com.infuse.service"})
+	 -->This will tell spring to find and scan components because we are using hirarchy
+	 ->without this we have to manually tell spring to find bean
+	 
+     #@EntityScan("com.infuse.entity")
+	 -->if entities are in different packages we should tell spring that entity is here
+	 
+     @EnableJpaRepositories("com.infuse.repository")
+	 -->this is to tell repository is here;
+	 
+--------------------------------------------------------------------------------------------------------
+ we need to call address-service from student-service
+for this we use WebClient  
+*before was RestTempelate but it is synchronous and blocking theread to wait for response
+there is wait and repond *
+
+WebClient is ASynchronous and non-Blocking 
+ ===================
+ 
+   >>In student-service include gradle repository:
+      implementation group: 'org.springframework', name: 'spring-webflux'
+	  
+ ****In the main App of student use WebClient to call other services using url:
+     in properties file of student  create 
+	 >>
+	 #address.service.url = http://localhost:8082/api/address 
+	 ->This is address of another service.
+	 Now in student main class above main create variable of url and embed value of properties file
+	 
+	 @Value("${address.service.url}")
+	private String addressServiceUrl;
+	
+	>>In main class : create bean of webClient
+	@Bean
+	public WebClient webClient()
+	{
+       WebClient webClient = WebClient.builder()
+			   .baseUrl(addressServiceUrl).build();
+	   return webClient;
+	}
+	
+	>> Now this will be used in student-service service class to call address-service;
+	as we want to get Address response :
+	
+	public AddressResponse getAddressById(long addressId)
+    {
+        Mono<AddressResponse> addressResponse =
+        webClient.get().uri("/getbyid/" + addressId).retrieve()
+                .bodyToMono(AddressResponse.class);
+        return addressResponse.block();
+    }
+	
+---->
+Flux
+A Flux represents a stream of elements. It’s a sequence that will asynchronously emit any
+ number of items (0 or more) in the future, before completing 
+ (either successfully or with an error).
+
+In reactive programming, this is our bread-and-butter.
+ A Flux is a stream that we can transform (giving us a new stream of transformed events),
+ buffer into a List, reduce down to a single value, concatenate and merge with other Fluxes,
+ or block on to wait for a value.
+ 
+ mono:
+ To read the response body, we need to get a Mono
+ (i.e: an async future value) for the contents of the response. 
+ We then need to unwrap that somehow, to trigger the request and
+ get the response body content itself, once it’s available.
+
+
+There are a few different ways to unwrap an asynchronous value.
+ To start with, we’ll use the simplest traditional option, 
+ by blocking to wait for the data to arrive:
+ 
+ String responseBody = responseSpec.bodyToMono(String.class).block();
+ This gives us a string containing the raw body of the response.
+ It’s possible to pass different classes here to parse content automatically 
+ 
+ into an appropriate format, or to use a Flux here instead to receive a stream
+ of response parts (fir example from an event-based API), but we’ll come back to
+ that in just a minute.
+
+Note that we’re not checking the status here ourselves.
+ When we use .retrieve(), the client automatically checks
+ the status code for us, providing a sensible default by 
+ throwing an error for any 4xx or 5xx responses. 
+ We’ll talk about custom status checks & error handling later on too.
+ 
+ >>> NOW USE SPRING CLOUD OPENFEIGN
+    *This is doing same what WebClient is doing for us but with additional features
+	It is providing declerative way and making our life easy;
+	It is just making rest calls to other services ;
+	Just like we are making calls GetMapping .PostMapping and also providing
+	Path variables same like in spring boot apps OPENFEIGN is proving us same 
+	structure;
+	
+	>>Configure OpenFeign:
+	Give dependency of openFeign ;
+	add pakage viz feignClients
+	and add in main class
+	#@EnableFeignClients("com.infuse.feignClients")
+	
+	>>our feign client will be an interface
+	create interface AddressFeignClient
+	
+	annotate it:
+	//address.service.url is coming from properties file 
+        @FeignClient(url = "${address.service.url}" ,
+		value = "address-feign-client",
+                 path = "/api/address")
+				 
+	..add the controller method of address-service here you want to call:
+	@GetMapping("/getbyid/{id}")
+    public AddressResponse getAddressById(@PathVariable long id);
+	..>Now autowire this instance in service class and make a 
+	
+	you are  good to go:
+	
+>>Now the focus is SERVICE Discovery and registry:
+    SPRING cloud Eureka is used for that
+	this is from netflix
+	each microservices register itself here with address:port number
+	in future if you are changing port number you have to update it only here:
+	this will discover our microservices upon registry:
+	>>Create another spring starter project viz :Eureka server:
+	and add eureka server dependency:
+	in properties file
+	server.port = 8761 : This port number is recommended not necessary to be exact
+     spring.application.name = eureka-server
+	 add in main app:
+	 #@EnableEurekaServer: indicates this is not normal spring boot application
+	 
+	 >>Thing is that our microservices has to register with this eureka-server
+	 as a client:
+	 so add eureka-server client dependency in each microservices
+	 
+	add #@EnableDiscoveryClient in both microservices in main app 
+	Provide url of eureka server in properties file of both microservices
+	eureka.client.service-url.defaultZone = http://localhost:8761/eureka
+	
+	>>Remember the order you need to start the eureka server first then microservices
+	  open http://localhost:8761 and see:
+	  
+	  **Notice there is eureka server also registered as client which is not our service
+     so go in eureka-server properties and disable this by:
+       eureka.client.register-with-eureka = false
+       eureka.client.fetch-registry = false	 
+	   
+	   
+	   
+>>> Client side Load balancing
+  need: if we have multiple instance of a service say address-service and we are requesting
+  it , there much be a mechanism which will balance the load otherwise one instance will 
+  get requests and downgrade and others will sit idle:
+  
+  >Spring provide
+  *spring cloud load balancer
+   This follows round robin method to balance load:
+   ist request to ist instance 2nd request to 2nd instance 3rd request to ist instance
+   4th to 2nd instance and so on:
+   *Earlier it was ribbon now it is spring cloud load balancer
+   >>Remember we are calling from student to address so we need to configure
+   load balancing in student-service:
+   >>
+   add dependency:  spring cloud starter load balancer in student gradle:
+   create class in feign client pakage as you are balancing feign client:
+   AddressLoadBalancerconfig : or AddLoadBalConfig:
+   
+   annotate it with:
+   #@LoadBalancerClient(value = "Address-Service") : value is name of service for 
+   which we are balancing load:
+   
+   inside this class create bean and @LoadBalanced:
+   
+    @LoadBalanced
+    @Bean
+    public Feign.Builder feignBuilder()
+    {
+        return Feign.builder();
+    }
+	
+	***You are all set:
+	run eureka-server , student-service ,address-service and then change port of
+	address-service to 8083 and run again , this way we will get two instances of address-service
+	You can change in intellij run> to run multiple instances
+	hit by postman
+	you will notice one request is getting by instance 1: another by instance 2:
+	this is all:
+	
+   
+>>>Spring cloud Api gateway
+     Earlier it was Zuul: now depreciated 
+
+   need:Suppose you want to authenticate user and log all microservices at one place:
+   here is api gateway it is a separate spring boot app which will be like a middle man:
+   all the users will hit api gateway : this gateway will authenticate and will allow the
+   user and hit appropriate microservice :, the server will give the response to gateway
+   and the gateway to user:
+   Route that paticular request to appropriate microservice:
+   no need to share the url of microservice , share gateway url:
+   applicable for all microservices
+   Gateway will route using eureka : as it has all details
+   Terms: Cross cutting concerns
+   prefilter: you request a paticular api and you have to add header to send
+             authentication details also this you can achieve by prefilter:
+   postfilter:  the api authenticates and sends request to appropriate microservice
+              and gets response back then gateway will send this response to user or log
+			  the response
+			  this can be achieved by postfilter;
+		
+   >>Create spring boot application api-gateway :
+    add dependency Gateway :
+     and eureka client dependency , as it is also a client of eureka-server:
+     server.port = 9090
+     spring.application.name = api-gateway	
+
+     in main class @EnableDiscoveryClient 
+     put eureka-server address :
+     eureka.client.service-url.defaultZone = http://localhost:8761/eureka	
+
+     and make discovery locator allowed:
+     spring.cloud.gateway.discovery.locator.enabled = true
+	 as we are providing lower case in services and upper case in eureka 
+     spring.cloud.gateway.discovery.locator.lower-case-service-id = true
+     run all services and hit gateway:
+	 /url-of-gateway/service-name/resource-url  e.g;
+     http://localhost:9090/student-service/api/student/getById/1	
+
+   >>>Create prefilter : 
+     create a class in gateway service: say CustomFilter:
+     annotate it with
+      #@Configuration:
+     customFilter implements Globalfilter:
+	  use:
+	  Logger logger = LoggerFactory.getLogger(customFilter.class)
+	  @Override
+	  public Mono<void> filter(ServerWebExchange exchange ,GatewayFilterChain chain)
+	  {
+	     ServerHttpRequest request = exchange.getRequest();
+		 logger.info("Authorization = " +request.getHeaders().getFirst("Authorization");
+		 return chain.filter(exchange);
+	  }
+
+>>>when you pass the Authorization in postman you can see it in console of api-gateway
+
+   Postfilter :  Response from the server:
+      inside class:
+	   return chain.filter(exchange).then(Mono.fromRunnable(()->{
+	     ServerHttpResponse response = exchange.getResponse();
+		 logger.info("post filter " + response.getStatusCode());
+	   });
+	 Run and see console this will be applicable for all responses from server:
+	 if you want to get for a particular request use if condition:
+	 
+	 return chain.filter(exchange).then(Mono.fromRunnable()->
+	  {
+	     ServerHttpResponse response = exchange.getResponse();
+		 if(request.getURI().toString().contains("/api/student/"))
+		 {
+		   logger.info(response.getStatusCode());
+		 }
+	 });
+	 
+	 This will be for particular request;
+	 
+	 >>** Important point is that we are calling from api-gateway to student-service
+	      then student-service is calling address-service
+		  address-service gives response to student and then response is send from api-gateway
+		  
+		  *we have feign-client specific to address:
+		  but we cam make this feign-client for all services:
+		  
+		  now: 
+		  our api-gateway will call student-service
+		      student-service will give response to api-gateway
+			  then api-gateway will call address-service
+			  then address-service will send response to api-gateway then 
+			  from that to user:
+			  
+		>>Changes in feign-client present in student-service
+             give the name of api-gateway
+			 
+		@FeignClient(value = "api-gateway")
+		public interface AddressFeignClient
+		  // give full address here
+		  @GetMapping("/address-service/api/getAddressById/{id}")
+		  public AddressResponse getById(@PathVariable long id);
+		}
+		
+		You can now change name to feign client as it is not specific to address
+		we are calling from student-service to api-gateway
+		internal calls and cross cutting concerns will be handled by api-gateway
+		
+>>Load balancing with api-gateway:	
+  we made addSerLoadBalancingConfig class in student-service as it was balancing load:
+
+  api gateway is automatically doing this for us:
+  we dont need extra code to do this .
+  we can comment out AddLoadBalConfig class:
+  and check load balancing is done automatically  
+  :Zuul API Gateway - Deprecated: earlier part by spring:
+  Troubleshooting Issue
+  If you face error like "java.net.UnknownHostException: failed to resolve...." 
+  then add below property in your student and address microservices.
+  #eureka.instance.hostname=localhost
+  
+  >>>Failures in MICROSERVICES
+  we are calling from student-service to address-service:
+  there may be failures like address-service is down:
+  address-service is having n number of failures:
+  for this we will use Resilience4j
+  
+  >>Fault Tolerance:
+  need: if we have tens of microservices and there is a issue in one microservice:
+  there will be an impact on other calling microservices too:
+  in our case if address-service is having issue it will be cascaded to student-service too
+  as it is caller of faulty address-service:
+  we want that if there is issue with one microservice it should not be reflected to other
+  services in hirarchy:
+  here comes fault tolerance,
+  
+  >>Circuit Breaker:
+	if there is an issue MCB in homes cut the whole power supply to home and protect appliances:
+     Same if there is issue with address-service SWITCH will automatically detect
+	 and will make circuit open: (means switch off)
+	 and if everything is fine switch will be ok:
+	 
+	 circuit breaker states:
+	 -closed :- means all calls are allowed:
+	 -open :- no calls allowed:open means(circuit is open , supply cut)
+	 -Half-open :- few calls allowed  :means how many calls : depends on how we configure it
+	 *calls here means total traffic calls ,number of calls;
+	 here call is from student-service to address-service
+	 
+	 >>Circuit breaker properties:
+	 -slidingWindowSize :- means last number of calls will be considered: Numeric value is given
+	   e.g : we have rate of 1000 calls per minute from student-service to address-service
+	   and our window size is 100:  the calls from 901 to 1000 will be taken by service:
+	   depends on the size of slidingWindow , last calls will be taken.
+	   how many last calls we want to consider
+	 -*****
+	 we have to define threshold %age :
+	 means how much %age of fault we want to tolerate :
+	 ->ON ------------>OFF
+	 ->CLOSED --------> OPEN
+	 if failure rate is greater than threshold cut supply and make switch OPEN:
+	 Failure Rate >= failureRateThreshold;
+	 if threshold is 50%
+	 and in total 100 calls 60 calls are not answered so failure rate is greater than 50% 
+	 threshold : so switch will be OPEN:
+	 *Now we cant make our switch open for a long time so define wait time also
+	 that is for how much time you want to make switch open:
+	 
+	 waitDurationInOpenState = 30s
+	 so for 30s no calls are allowed so we are not bombarding address-service so that
+	 it can resolve issue / recover:
+	 
+	 ok From OPEN we cant go diretly to CLOSED state we will take 
+	 few calls to check failure rate for that we have
+	 HALF-OPEN : 
+	 now from OPEN TO HALF-OPEN:
+	 automatic from open to half open:
+	 it will take few calls and check failure rate if rate is greater than threshold
+	 it will go back to OPEN state:
+	 else it will go to closed state if everything is fine or recovered:
+	 
+	 permitttedNumberOfCallsInHalfOpenState = 5;
+	 so half open state will take 5 calls and check failed %age rate
+   
+    adding Resilience4j dependency which is our circuit breaker
+
+   	1: resilience4j-spring-boot2
+	2: spring-boot-starter-aop     
+	  :Resilience4j is internally using aop 
+	  *- aspect oriented programming (aop) : a programming style that can be adopted
+	  to define certain policies that in turn are used to define and manage cross cutting
+	  concerns in an application : making application adaptable to changes
+	 
+	3 : spring-boot-starter-actuator
+	   to check the current state of switch 
+	 
+	 
+	 
+	 
+			  

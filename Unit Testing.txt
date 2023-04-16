@@ -1,0 +1,52 @@
+if u want to reapeat the same test
+@RepeatedTest(10)
+or
+@RepeatedTest(value=10, name = RepeatedTest.LONG_DIAPLAY_NAME)
+
+check test performance
+executable is lamda of method
+assertTimeout(Duration.ofMillis(500),executable)
+
+use assumptions whether u want to run here or not
+declare variable enovironment in test class
+
+private String enivironment = "dev"
+
+and inside the method body
+//given
+assumeTrue(this.enivironment.equals("prod"));
+now this test case will be skipped
+
+and if you want to run it 
+change enivironment variable to "prod"
+
+if u want to organise differnt related test cases
+make nested classes
+e.g
+class BMTcalculatorTest{
+
+  @Nested
+  class findCoderwithWorstBmi
+   {
+  write all tests related to coder
+   }
+   
+  same to make different classes
+ you will get results in organised way
+
+}
+
+
+if u want to name a particular test
+@Test 
+@DisplayName("Worst coder")
+
+
+if u want to skip test
+@Disabled
+
+
+if you want to skip test on particular OS
+
+@DisabledonOs(OS.WINDOWS)
+

@@ -1,0 +1,17 @@
+set JAVA_HOME=C:\SOFTWARE\openlogic-openjdk-8u352-b08-windows-64
+set M2_HOME=C:\SOFTWARE\apache-maven-3.8.6-bin\apache-maven-3.8.6
+set PATH=%JAVA_HOME%\bin;%M2_HOME%\bin;%PATH%
+
+
+http://localhost:8080/api/message 
+this directly calls message service running on 8080
+
+
+http://localhost:8080/api/message 
+this directly calls message service running on 8081
+
+http://localhost:9090/api/message 
+this directly calls message micro service rest controoler
+because we are using load balancer on displayService side
+request from display microservice will be delegated to
+8080 , 8081 alternatively
